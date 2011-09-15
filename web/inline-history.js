@@ -89,7 +89,7 @@ var inline_history = {
       // item[5] : int; dupe bug id (or 0)
       // item[6] : bool; is flag
       var user = item[0];
-      var time = itme[1];
+      var time = item[1];
 
       var reachedEnd = false;
       for (var j = 0, jl = commentTimes.length; j < jl; j++) {

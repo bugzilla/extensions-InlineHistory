@@ -138,7 +138,7 @@
       [%~%]<a href="[% see_also FILTER html FILTER js %]" target="_blank">
       [%~%][% see_also FILTER html FILTER js %]</a>
       [%- ", " IF NOT loop.last %]
-    [% END %]
+    [% END -%]
   [% ELSIF change.fieldname == 'assigned_to' ||
            change.fieldname == 'reporter' ||
            change.fieldname == 'qa_contact' ||

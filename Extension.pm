@@ -18,6 +18,19 @@ our $VERSION = '1.5';
 # don't show inline history for bugs with lots of changes
 use constant MAXIMUM_ACTIVITY_COUNT => 500;
 
+# don't show really long values
+use constant MAXIMUM_VALUE_LENGTH   => 256;
+
+sub template_before_create {
+    my ($self, $args) = @_;
+    $args->{config}->{FILTERS}->{ih_short_value} = sub {
+        my ($str) = @_;
+        return length($str) <= MAXIMUM_VALUE_LENGTH
+               ? $str
+               : substr($str, 0, MAXIMUM_VALUE_LENGTH - 3) . '...';
+    };
+}
+
 sub template_before_process {
     my ($self, $args) = @_;
     my $file = $args->{'file'};
@@ -34,9 +47,7 @@ sub template_before_process {
     my $bug_id = $bug->id;
 
     # build bug activity
-    my ($activity) = $bug->can('get_activity')
-        ? $bug->get_activity()
-        : Bugzilla::Bug::GetBugActivity($bug_id);
+    my ($activity) = Bugzilla::Bug::GetBugActivity($bug_id);
     $activity = _add_duplicates($bug_id, $activity);
 
     if (scalar @$activity > MAXIMUM_ACTIVITY_COUNT) {
@@ -94,7 +105,7 @@ sub template_before_process {
 
             my $field_obj;
             if ($change->{fieldname} =~ /^cf_/) {
-                $field_obj = Bugzilla::Field->new({ name => $change->{fieldname} });
+                $field_obj = Bugzilla::Field->new({ name => $change->{fieldname}, cache => 1 });
             }
 
             # identify buglist changes
@@ -159,28 +170,25 @@ sub _add_duplicates {
 
     my ($bug_id, $activity) = @_;
 
+    # we're ignoring pre-bugzilla 3.0 ".. has been marked as a duplicate .."
+    # comments because searching each comment's text is expensive.  these
+    # legacy comments will not be visible at all in the bug's comment/activity
+    # stream.  bug 928786 deals with migrating those comments to be stored as
+    # CMT_HAS_DUPE instead.
+
     my $dbh = Bugzilla->dbh;
     my $sth = $dbh->prepare("
         SELECT profiles.login_name, " .
                $dbh->sql_date_format('bug_when', '%Y.%m.%d %H:%i:%s') . ",
-               extra_data,
-               thetext
+               extra_data
           FROM longdescs
                INNER JOIN profiles ON profiles.userid = longdescs.who
-         WHERE bug_id = ?
-               AND (
-                 type = ?
-                 OR thetext LIKE '%has been marked as a duplicate of this%'
-               )
+         WHERE bug_id = ? AND type = ?
          ORDER BY bug_when
     ");
     $sth->execute($bug_id, CMT_HAS_DUPE);
 
-    while (my($who, $when, $dupe_id, $the_text) = $sth->fetchrow_array) {
-        if (!$dupe_id) {
-            next unless $the_text =~ / (\d+) has been marked as a duplicate of this/;
-            $dupe_id = $1;
-        }
+    while (my($who, $when, $dupe_id) = $sth->fetchrow_array) {
         my $entry = {
             'when' => $when,
             'who' => $who,

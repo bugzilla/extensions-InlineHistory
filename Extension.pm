@@ -13,7 +13,7 @@ use Bugzilla::User::Setting;
 use Bugzilla::Constants;
 use Bugzilla::Attachment;
 
-our $VERSION = '1.5';
+our $VERSION = '1.6';
 
 # don't show inline history for bugs with lots of changes
 use constant MAXIMUM_ACTIVITY_COUNT => 500;
